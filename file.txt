@@ -1,0 +1,1 @@
+{"ID":"ElevInfo","Words":"Heis","ElevIP":"192.168.1.3","CurrentFloor":0,"Direction":0,"NumberOrders":0,"LocolOrders":[0,0,0,0],"ExternalOrders":[[0,0],[0,0],[0,0],[0,0]],"Recipe":false,"NewOrder":{"ID":"NewOrder","Words":"","Position":[0,0],"ElevIP":""}}
