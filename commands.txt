@@ -1,0 +1,9 @@
+ssh student@129.241.187.140 - Koble til annen PC
+
+scp -r heis/main student@129.241.187.140:~/gr26/ - Lagrer en mappe på annen pc
+
+mkdir "navn" - Oppretter en mappe med navn "navn"
+
+ls - ser hvilke mapper som er på gitt plassering
+
+
