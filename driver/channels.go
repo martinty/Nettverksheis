@@ -1,59 +1,59 @@
 package driver
 
 //in port 4
-const PORT4SUBDEVICE = 3
-const PORT4CHANNELOFFSET = 16
+const port4Subdevice = 3
+const port4Channeloffset = 16
 
-const OBSTRUCTION = (0x300+23)
-const STOP = (0x300+22)
-const BUTTONCOMMAND1 = (0x300+21)
-const BUTTONCOMMAND2 = (0x300+20)
-const BUTTONCOMMAND3 = (0x300+19)
-const BUTTONCOMMAND4 = (0x300+18)
-const BUTTONUP1 = (0x300+17)
-const BUTTONUP2 = (0x300+16)
+const obstruction = (0x300 + 23)
+const stop = (0x300 + 22)
+const buttonCommand1 = (0x300 + 21)
+const buttonCommand2 = (0x300 + 20)
+const buttonCommand3 = (0x300 + 19)
+const buttonCommand4 = (0x300 + 18)
+const buttonUp1 = (0x300 + 17)
+const buttonUp2 = (0x300 + 16)
 
 //in port 1
-const PORT1SUBDEVICE = 2
-const PORT1CHANNELOFFSET = 0
-const BUTTONDOWN2 = (0x200+0)
-const BUTTONUP3 = (0x200+1)
-const BUTTONDOWN3 = (0x200+2)
-const BUTTONDOWN4 = (0x200+3)
-const SENSORFLOOR1 = (0x200+4)
-const SENSORFLOOR2 = (0x200+5)
-const SENSORFLOOR3 = (0x200+6)
-const SENSORFLOOR4 = (0x200+7)
+const port1Subdevice = 2
+const port1Channeloffset = 0
+const buttonDown2 = (0x200 + 0)
+const buttonUp3 = (0x200 + 1)
+const buttonDown3 = (0x200 + 2)
+const buttonDown4 = (0x200 + 3)
+const sensorFloor1 = (0x200 + 4)
+const sensorFloor2 = (0x200 + 5)
+const sensorFloor3 = (0x200 + 6)
+const sensorFloor4 = (0x200 + 7)
 
 //out port 3
-const PORT3SUBDEVICE = 3
-const PORT3CHANNELOFFSET = 8
+const port3Subdevice = 3
+const port3Channeloffset = 8
 
-const MOTORDIR = (0x300+15)
-const LIGHTSTOP = (0x300+14)
-const LIGHTCOMMAND1 = (0x300+13)
-const LIGHTCOMMAND2 = (0x300+12)
-const LIGHTCOMMAND3 = (0x300+11)
-const LIGHTCOMMAND4 = (0x300+10)
-const LIGHTUP1 = (0x300+9)
-const LIGHTUP2 = (0x300+8)
+const motorDir = (0x300 + 15)
+const lightStop = (0x300 + 14)
+const lightCommand1 = (0x300 + 13)
+const lightCommand2 = (0x300 + 12)
+const lightCommand3 = (0x300 + 11)
+const lightCommand4 = (0x300 + 10)
+const lightUp1 = (0x300 + 9)
+const lightUp2 = (0x300 + 8)
 
 //out port 2
-const PORT2SUBDEVICE = 3
-const PORT2CHANNELOFFSET = 0
-const LIGHTDOWN2 = (0x300+7)
-const LIGHTUP3 = (0x300+6)
-const LIGHTDOWN3 = (0x300+5)
-const LIGHTDOWN4 = (0x300+4)
-const LIGHTDOOROPEN = (0x300+3)
-const LIGHTFLOORIND2 = (0x300+1)
-const LIGHTFLOORIND1 = (0x300+0)
+const port2Subdevice = 3
+const port2Channeloffset = 0
+const lightDown2 = (0x300 + 7)
+const lightUp3 = (0x300 + 6)
+const lightDown3 = (0x300 + 5)
+const lightDown4 = (0x300 + 4)
+const lightDoorOpen = (0x300 + 3)
+const lightFloorInd2 = (0x300 + 1)
+const lightFloorInd1 = (0x300 + 0)
 
 //out port 0
-const MOTOR = (0x100+0)
+const motor = (0x100 + 0)
 
 //non-existing ports (for alignment)
-const BUTTONDOWN1 = -1
-const BUTTONUP4 = -1
-const LIGHTDOWN1 = -1
-const LIGHTUP4 = -1
+const buttonDown1 = -1
+const buttonUp4 = -1
+const lightDown1 = -1
+const lightUp4 = -1

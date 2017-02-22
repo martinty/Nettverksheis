@@ -1,32 +1,32 @@
 package main
 
 import (
-	//"./driver"
+	"./driver"
 	"./network/UDP"
+	"./queue"
+	"./source"
 	"encoding/json"
 	"fmt"
-	"log"
+	//"log"
 	"os"
 	"time"
 )
 
-func print_msg(newMsgChanRecive chan UDP.Elev_info) {
+func printMsg(newMsgChanRecive chan source.ElevInfo) {
 
-	var recievedMsg UDP.Elev_info
-
+	var recievedMsg source.ElevInfo
 	for {
 		recievedMsg = <-newMsgChanRecive
+		writeToFile(recievedMsg)
 		fmt.Println(recievedMsg.ID, "--", recievedMsg.Words, "--", recievedMsg.NewOrder.ID, "--", recievedMsg.Recipe)
 	}
-
 }
 
-func changeTransmit(newMsgChanTransmit chan UDP.Elev_info, msg UDP.Elev_info) {
+func changeTransmit(newMsgChanTransmit chan source.ElevInfo, msg source.ElevInfo) {
 
 	for {
 		fmt.Scan(&msg.Words)
 		newMsgChanTransmit <- msg
-		writeToFile(msg)
 	}
 }
 
@@ -36,61 +36,52 @@ func createFile() bool {
 	if err != nil {
 		file, err := os.Create("file.txt")
 		file.Close()
-		if err != nil {
-			log.Fatal("Cannot create file", err)
-		}
+		source.CheckForError(err)
 		return true
 	}
 	return false
 }
 
-func writeToFile(msg UDP.Elev_info) {
+func writeToFile(msg source.ElevInfo) {
 	_ = os.Remove("file.txt")
 	file, _ := os.Create("file.txt")
 	file.Close()
 	file, err := os.OpenFile("file.txt", os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatal("Cannot write to file", err)
-	}
+	source.CheckForError(err)
 
 	buf, _ := json.Marshal(msg)
 	_, err = file.Write(buf)
+	source.CheckForError(err)
 
 	file.Close()
 }
 
-func readFromFile() UDP.Elev_info {
+func readFromFile() source.ElevInfo {
 	file, err := os.Open("file.txt")
-	if err != nil {
-		log.Fatal("Cannot read from file", err)
-	}
+	source.CheckForError(err)
 
 	data := make([]byte, 1024)
 	count, err := file.Read(data)
-	if err != nil {
-		log.Fatal(err)
-	}
+	source.CheckForError(err)
 
-	var msgFromFile UDP.Elev_info
+	var msgFromFile source.ElevInfo
 
 	err = json.Unmarshal(data[:count], &msgFromFile)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
+	source.CheckForError(err)
 
 	file.Close()
 	return msgFromFile
 }
 
-func delete_file() {
+func deleteFile() {
 	_ = os.Remove("file.txt")
 }
 
-func test_UDP_network() {
-	var msg UDP.Elev_info
+func testUDPNetwork() {
+	var msg source.ElevInfo
 
-	newMsgChanRecive := make(chan UDP.Elev_info, 1)
-	newMsgChanTransmit := make(chan UDP.Elev_info, 1)
+	newMsgChanRecive := make(chan source.ElevInfo, 1)
+	newMsgChanTransmit := make(chan source.ElevInfo, 1)
 
 	port := ":20003"
 
@@ -105,16 +96,16 @@ func test_UDP_network() {
 	}
 
 	go UDP.Receiving(port, newMsgChanRecive)
-	go UDP.Transmitter(port, msg, newMsgChanTransmit)
-	go print_msg(newMsgChanRecive)
+	go UDP.Transmitting(port, msg, newMsgChanTransmit)
+	go printMsg(newMsgChanRecive)
 	go changeTransmit(newMsgChanTransmit, msg)
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
 }
-/*
-func test_driver() {
+
+func testDriver() {
 	driver.InitializeElevator()
 	driver.ElevatorSetMotorDirection(1)
 
@@ -137,11 +128,19 @@ func test_driver() {
 			driver.ElevatorSetMotorDirection(1)
 		}
 	}
-
 }
-*/
+
+func testQueue() {
+	var QueueMsg source.ElevInfo
+	queue.Init(QueueMsg)
+}
+
 func main() {
-	//delete_file()
-	test_UDP_network()
-	//test_driver()
+	//deleteFile()
+	go testUDPNetwork()
+	//go testDriver()
+	//testQueue()
+	for {
+	}
+
 }
