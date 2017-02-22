@@ -1,4 +1,4 @@
-cd D:\Dropbox\NTNU\Vår 2017\TTK4145 Sanntidsprogrammering\gr26_1\main
+cd D:\Dropbox\NTNU\Vår 2017\TTK4145 Sanntidsprogrammering\gr26\main
 
 # push to github
 git init
@@ -6,6 +6,9 @@ git add .
 git commit -m "comment"
 git remote add origin https://github.com/martinty/heis.git
 git push origin master
+
+# pull from github
+git pull https://github.com/martinty/heis.git 
 
 # clone from github
 git clone https://github.com/martinty/heis.git 
