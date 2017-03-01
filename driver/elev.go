@@ -1,12 +1,13 @@
 package driver
 
 import (
+    "../source"
     "fmt"
 )
 
 const motorSpeed = 2800
-const numFloors int = 4
-const numButtons int = 3
+const NumFloors int = 4
+const NumButtons int = 3
 const on bool = true
 const off bool = false
 
@@ -16,14 +17,14 @@ var ButtonType = map[string]int{
     "Button internal panel": 2,
 }
 
-var lampChannelsMatrix = [numFloors][numButtons]int{
+var lampChannelsMatrix = [NumFloors][NumButtons]int{
     {lightUp1, lightDown1, lightCommand1},
     {lightUp2, lightDown2, lightCommand2},
     {lightUp3, lightDown3, lightCommand3},
     {lightUp4, lightDown4, lightCommand4},
 }
 
-var buttonChannelsMatrix = [numFloors][numButtons]int{
+var buttonChannelsMatrix = [NumFloors][NumButtons]int{
     {buttonUp1, buttonDown1, buttonCommand1},
     {buttonUp2, buttonDown2, buttonCommand2},
     {buttonUp3, buttonDown3, buttonCommand3},
@@ -39,8 +40,8 @@ func InitializeElevator() bool {
         return false
     }
 
-    for floor := 0; floor < numFloors; floor++ {
-        for button := 0; button < numButtons; button++ {
+    for floor := 0; floor < NumFloors; floor++ {
+        for button := 0; button < NumButtons; button++ {
 
             if (button == ButtonType["Button call down"]) && (floor != 0) {
                 ElevatorSetButtonLamp(button, floor, off)
@@ -76,17 +77,17 @@ func ElevatorSetMotorDirection(motorDirection int) {
 
 func ElevatorSetButtonLamp(setButtonType int, floor int, on bool) {
 
-    if (floor < 0) || (floor > numFloors) {
+    if (floor < 0) || (floor > NumFloors) {
         fmt.Println("Invalid floor to set buttonlamp")
     }
 
-    if (setButtonType < 0) || (setButtonType > numButtons) {
+    if (setButtonType < 0) || (setButtonType > NumButtons) {
         fmt.Println("Invalid button type")
     }
     if (floor == 0) && (setButtonType == ButtonType["Button call down"]) {
         fmt.Println("Invalid button type to set button lamp")
     }
-    if (floor == numFloors-1) && (setButtonType == ButtonType["Button call up"]) {
+    if (floor == NumFloors-1) && (setButtonType == ButtonType["Button call up"]) {
         fmt.Println("Invalid button type to set button lamp")
     }
 
@@ -98,7 +99,7 @@ func ElevatorSetButtonLamp(setButtonType int, floor int, on bool) {
 }
 
 func ElevatorSetFloorIndicator(floor int) {
-    if floor < 0 || floor > numFloors {
+    if floor < 0 || floor > NumFloors {
         fmt.Println("Invalid floor to set floor indicator")
     }
 
@@ -124,26 +125,19 @@ func ElevatorSetDoorOpenLamp(on bool) {
     }
 }
 
-func ElevatorGetButtonSignal(getButtonType int, floor int) bool {
-
-    if (floor < 0) || (floor > numFloors) {
-        fmt.Println("Invalid floor to get button signal")
+func ElevatorGetButtonSignal(buttonUpdate source.ElevInfo) source.ElevInfo {
+    for floor := 0; floor < NumFloors; floor++ {
+        for button := 0; button < NumButtons; button++ {
+            if IOReadBit(buttonChannelsMatrix[floor][button]) != 0 {
+                if button == 2 {
+                    buttonUpdate.LocalOrders[floor] = 1
+                } else {
+                    buttonUpdate.ExternalOrders[floor][button] = 1
+                }
+            }
+        }
     }
-    if (getButtonType < 0) || (getButtonType > numButtons) {
-        fmt.Println("Invalid button type to get button signal")
-    }
-    if (floor == 0) && (getButtonType == ButtonType["Button call down"]) {
-        fmt.Println("Invalid button type to get button signal")
-    }
-    if (floor == numFloors-1) && (getButtonType == ButtonType["Button call up"]) {
-        fmt.Println("Invalid button type to get button signal")
-    }
-
-    if IOReadBit(buttonChannelsMatrix[floor][getButtonType]) != 0 {
-        return true
-    } else {
-        return false
-    }
+    return buttonUpdate
 }
 
 func ElevatorGetFloorSensorSignal() int {
