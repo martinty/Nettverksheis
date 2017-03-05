@@ -5,17 +5,15 @@ import (
     "fmt"
 )
 
-const motorSpeed = 2800
+const motorSpeed int = 2800
 const NumFloors int = 4
 const NumButtons int = 3
-const on bool = true
-const off bool = false
-
-var ButtonType = map[string]int{
-    "Button call up":        0,
-    "Button call down":      1,
-    "Button internal panel": 2,
-}
+const ButtonTypeUp int = 0
+const ButtonTypeDown int = 1
+const ButtonTypeCommand int = 2
+const MotorDirectionUp int = 0
+const MotorDirectionDown int = 1
+const MotorDirectionStop int = 2
 
 var lampChannelsMatrix = [NumFloors][NumButtons]int{
     {lightUp1, lightDown1, lightCommand1},
@@ -33,68 +31,40 @@ var buttonChannelsMatrix = [NumFloors][NumButtons]int{
 
 func InitializeElevator() bool {
 
-    var initSuccess bool = IOInitializeElevator()
-
-    if !initSuccess {
-
+    initStatus := IOInitializeElevator()
+    if !initStatus {
         return false
     }
-
     for floor := 0; floor < NumFloors; floor++ {
         for button := 0; button < NumButtons; button++ {
-
-            if (button == ButtonType["Button call down"]) && (floor != 0) {
-                ElevatorSetButtonLamp(button, floor, off)
-            }
-
-            if (button == ButtonType["Button call up"]) && (floor != 3) {
-                ElevatorSetButtonLamp(button, floor, off)
-            }
-            if button == ButtonType["Button internal panel"] {
-                ElevatorSetButtonLamp(button, floor, off)
-            }
+            ElevatorSetButtonLamp(button, floor, false)
         }
     }
-
-    ElevatorSetDoorOpenLamp(off)
+    ElevatorSetDoorOpenLamp(true)
     return true
 }
 
 func ElevatorSetMotorDirection(motorDirection int) {
 
-    if motorDirection > 0 { //Set direction up if positive number
+    if motorDirection == 0 {
         IOClearBit(motorDir)
         IOWriteAnalog(motor, motorSpeed)
-    } else if motorDirection < 0 { //Set direction down if negative number
+    } else if motorDirection == 1 { 
         IOSetBit(motorDir)
         IOWriteAnalog(motor, motorSpeed)
-    } else if motorDirection == 0 {
-        IOWriteAnalog(motor, 0) //if not stop elevator
+    } else if motorDirection == 2 {
+        IOWriteAnalog(motor, 0) 
     } else {
         fmt.Println("Unable to set motor direction")
     }
 }
 
-func ElevatorSetButtonLamp(setButtonType int, floor int, on bool) {
+func ElevatorSetButtonLamp(buttonType int, floor int, status bool) {
 
-    if (floor < 0) || (floor > NumFloors) {
-        fmt.Println("Invalid floor to set buttonlamp")
-    }
-
-    if (setButtonType < 0) || (setButtonType > NumButtons) {
-        fmt.Println("Invalid button type")
-    }
-    if (floor == 0) && (setButtonType == ButtonType["Button call down"]) {
-        fmt.Println("Invalid button type to set button lamp")
-    }
-    if (floor == NumFloors-1) && (setButtonType == ButtonType["Button call up"]) {
-        fmt.Println("Invalid button type to set button lamp")
-    }
-
-    if on {
-        IOSetBit(lampChannelsMatrix[floor][setButtonType])
+    if status {
+        IOSetBit(lampChannelsMatrix[floor][buttonType])
     } else {
-        IOClearBit(lampChannelsMatrix[floor][setButtonType])
+        IOClearBit(lampChannelsMatrix[floor][buttonType])
     }
 }
 
@@ -102,14 +72,11 @@ func ElevatorSetFloorIndicator(floor int) {
     if floor < 0 || floor > NumFloors {
         fmt.Println("Invalid floor to set floor indicator")
     }
-
-    // Binary encoding. one light must always be on.
     if floor&0x02 != 0 {
         IOSetBit(lightFloorInd1)
     } else {
         IOClearBit(lightFloorInd1)
     }
-
     if floor&0x01 != 0 {
         IOSetBit(lightFloorInd2)
     } else {
@@ -117,8 +84,8 @@ func ElevatorSetFloorIndicator(floor int) {
     }
 }
 
-func ElevatorSetDoorOpenLamp(on bool) {
-    if on {
+func ElevatorSetDoorOpenLamp(status bool) {
+    if status {
         IOSetBit(lightDoorOpen)
     } else {
         IOClearBit(lightDoorOpen)
@@ -138,6 +105,14 @@ func ElevatorGetButtonSignal(buttonUpdate source.ElevInfo) source.ElevInfo {
         }
     }
     return buttonUpdate
+}
+
+func ElevatorCheckButtonSignal(button int, floor int) bool{
+    if IOReadBit(buttonChannelsMatrix[floor][button]) != 0{
+        return true
+    } else{
+        return false
+    }
 }
 
 func ElevatorGetFloorSensorSignal() int {

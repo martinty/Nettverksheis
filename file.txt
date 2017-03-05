@@ -1,1 +1,1 @@
-{"ID":"ElevInfo","Words":"Hello from school","ElevIP":"129.241.187.150","CurrentFloor":0,"Direction":0,"NumberOrders":0,"LocalOrders":[1,1,1,1],"ExternalOrders":[[1,0],[1,1],[1,1],[0,1]],"Recipe":false,"NewOrder":{"ID":"NewOrder","Words":"","Position":[0,0],"ElevIP":""}}
+{"ID":"ElevInfo","Words":"Hello from school","ElevIP":"129.241.187.48","CurrentFloor":0,"Direction":0,"NumberOrders":0,"LocalOrders":[0,0,1,0],"ExternalOrders":[[0,0],[0,0],[0,0],[0,0]],"Recipe":false,"NewOrder":{"ID":"NewOrder","Words":"","Position":[0,0],"ElevIP":""}}

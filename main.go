@@ -5,6 +5,7 @@ import (
 	"./network/UDP"
 	"./queue"
 	"./source"
+	"./FSM"
 	"fmt"
 	"time"
 )
@@ -38,7 +39,7 @@ func testUDPNetwork() {
 	newMsgChanRecive := make(chan source.ElevInfo, 1)
 	newMsgChanTransmit := make(chan source.ElevInfo, 1)
 
-	port := ":20003"
+	port := ":20023"
 
 	if queue.CreateFile() {
 		msg.ID = "ElevInfo"
@@ -72,7 +73,7 @@ func testDriver() {
 			driver.ElevatorSetFloorIndicator(currentFloor)
 		}
 		if currentFloor == 3 {
-			driver.ElevatorSetMotorDirection(-1)
+			driver.ElevatorSetMotorDirection(1)
 		} else if currentFloor == 0 {
 			driver.ElevatorSetMotorDirection(0)
 		}
@@ -80,8 +81,22 @@ func testDriver() {
 }
 
 func testQueue() {
-	var QueueMsg source.ElevInfo
-	queue.Init(QueueMsg)
+	for{
+		queue.UpdateOrders()
+	}
+}
+
+func testFSM(){
+	FMS.ElevatorStartUp()
+	var floorNumber int = -1
+	for{
+		floorNumber = driver.ElevatorGetFloorSensorSignal()
+		if floorNumber != -1{
+			driver.ElevatorSetFloorIndicator(floorNumber)
+			FMS.ElevatorHasArrivedAtFloor(floorNumber)
+			FMS.SetElevetorDirection()
+		}
+	}
 }
 
 func main() {
@@ -89,8 +104,8 @@ func main() {
 	queue.DeleteFile()
 	go testUDPNetwork()
 	//go testDriver()
-	//testQueue()
+	go testQueue()
+	go testFSM()
 	for {
 	}
-
 }
