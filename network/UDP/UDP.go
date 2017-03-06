@@ -16,6 +16,11 @@ func GetLocalIP() string {
 	return localIP[0]
 }
 
+func GetLocalID(IP string) string {
+	localID := strings.Split(IP, ".")
+	return localID[3]
+}
+
 func Receiving(port string, newMsgChanRecive chan source.ElevInfo) {
 
 	adress, err := net.ResolveUDPAddr("udp", port)
@@ -30,24 +35,22 @@ func Receiving(port string, newMsgChanRecive chan source.ElevInfo) {
 		n, _, err := connection.ReadFromUDP(recieveBuffer)
 		source.CheckForError(err)
 
-		ID := string(recieveBuffer[7:15])
+		//ID := string(recieveBuffer[7:15])
 
-		if ID == "ElevInfo" {
+		var newMsg source.ElevInfo
 
-			var newMsg source.ElevInfo
+		err = json.Unmarshal(recieveBuffer[:n], &newMsg)
+		source.CheckForError(err)
 
-			err = json.Unmarshal(recieveBuffer[:n], &newMsg)
-			source.CheckForError(err)
-
-			newMsgChanRecive <- newMsg
-		}
+		newMsgChanRecive <- newMsg
+		
 	}
 }
 
 func Transmitting(port string, msg source.ElevInfo, newMsgChanTransmit chan source.ElevInfo) {
 
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.150"+port) //Skole 3
-	adress, err := net.ResolveUDPAddr("udp", "129.241.187.48"+port) //Skole 23
+	adress, err := net.ResolveUDPAddr("udp", "129.241.187.145"+port) //Skole 17
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.149"+port) //Skole 2
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.140"+port) //Skole 1
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.255"+port) //Skole broadcast
@@ -65,12 +68,12 @@ func Transmitting(port string, msg source.ElevInfo, newMsgChanTransmit chan sour
 			buf, _ := json.Marshal(msg)
 			_, err = connection.Write(buf)
 			source.CheckForError(err)
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 		default:
 			buf, _ := json.Marshal(msg)
 			_, err = connection.Write(buf)
 			source.CheckForError(err)
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

@@ -8,10 +8,29 @@ import (
 	"os"
 )
 
-var orderTable[4][3] int
+
+var orderTable[4][3] 			int
+var elevatorDirection 			int = -1
+var elevatorFloor 	 			int = -1
+
+var infoTable map[string]source.ElevInfo
 
 func Init() {
-	fmt.Println("heis")
+	infoTable = make(map[string]source.ElevInfo)
+	var info source.ElevInfo = ReadFromFile()
+	for floor := 0; floor < driver.NumFloors; floor++ {
+        for button := 0; button < driver.NumButtons; button++ {
+        	if button == driver.ButtonTypeCommand{
+        		orderTable[floor][driver.ButtonTypeCommand] = info.LocalOrders[floor]
+        	} else{
+        		orderTable[floor][button] = info.ExternalOrders[floor][button]        	}
+		}
+	}
+}
+
+func UpdateInfoTable(msg source.ElevInfo){
+	infoTable[msg.ID] = msg
+	fmt.Println(infoTable)
 }
 
 func UpdateOrders() {
@@ -20,15 +39,50 @@ func UpdateOrders() {
         	if driver.ElevatorCheckButtonSignal(button, floor){
         		if orderTable[floor][button] == 0{
         			orderTable[floor][button] = 1
-        			fmt.Println(orderTable)
         		}
         	}
         }
     }
 }
 
+func UpdateElevatorInfo(msg source.ElevInfo) source.ElevInfo{
+	for floor := 0; floor < driver.NumFloors; floor++ {
+        for button := 0; button < driver.NumButtons; button++ {
+        	if button == driver.ButtonTypeCommand{
+        		msg.LocalOrders[floor] = orderTable[floor][driver.ButtonTypeCommand] 
+        	} else{
+        		msg.ExternalOrders[floor][button] = orderTable[floor][button]
+        	}
+		}
+	}
+	msg.CurrentDirection = elevatorDirection
+	msg.CurrentFloor = elevatorFloor 
+	return msg 
+}
+
+
+func UpdateElevatorFloor(floor int) {
+	elevatorFloor = floor
+}
+
+func UpdateElevatorDirection(direction int){
+	elevatorDirection = direction
+}
+
 func DeleteOrder(button int, floor int) {
 	orderTable[floor][button] = 0
+}
+
+func UpdateButtonLight(){
+	for floor := 0; floor < driver.NumFloors; floor++ {
+        for button := 0; button < driver.NumButtons; button++ {
+        	if orderTable[floor][button] != 0{
+        		driver.ElevatorSetButtonLamp(button, floor, true)
+        	} else{
+        		driver.ElevatorSetButtonLamp(button, floor, false)
+        	}
+        }
+    }
 }
 
 func GetMotorDirection(currentFloor int, currentDirection int) int{

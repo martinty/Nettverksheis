@@ -2,12 +2,15 @@ package main
 
 import (
 	"./driver"
+	"./FSM"
 	"./network/UDP"
 	"./queue"
 	"./source"
-	"./FSM"
-	"fmt"
+	//"fmt"
 	"time"
+    "os"
+    "os/signal"
+    "syscall"
 )
 
 func printMsg(newMsgChanRecive chan source.ElevInfo) {
@@ -16,14 +19,15 @@ func printMsg(newMsgChanRecive chan source.ElevInfo) {
 	for {
 		recievedMsg = <-newMsgChanRecive
 		queue.WriteToFile(recievedMsg)
-		fmt.Println(recievedMsg.ID, "--", recievedMsg.ExternalOrders, "--", recievedMsg.LocalOrders)
+		queue.UpdateInfoTable(recievedMsg)
+		//fmt.Println(recievedMsg)
 	}
 }
 
-func changeTransmit(newMsgChanTransmit chan source.ElevInfo, msg source.ElevInfo) {
+func updateTransmit(newMsgChanTransmit chan source.ElevInfo, msg source.ElevInfo) {
 
 	for {
-		msg = driver.ElevatorGetButtonSignal(msg)
+		msg = queue.UpdateElevatorInfo(msg)
 		select {
 		case newMsgChanTransmit <- msg:
 			continue
@@ -39,13 +43,11 @@ func testUDPNetwork() {
 	newMsgChanRecive := make(chan source.ElevInfo, 1)
 	newMsgChanTransmit := make(chan source.ElevInfo, 1)
 
-	port := ":20023"
+	port := ":20017"
 
 	if queue.CreateFile() {
-		msg.ID = "ElevInfo"
-		msg.Words = "Hello from school"
-		msg.ElevIP = UDP.GetLocalIP()
-		msg.NewOrder.ID = "NewOrder"
+		msg.IP = UDP.GetLocalIP()
+		msg.ID = UDP.GetLocalID(msg.IP)
 		queue.WriteToFile(msg)
 	} else {
 		msg = queue.ReadFromFile()
@@ -54,58 +56,49 @@ func testUDPNetwork() {
 	go UDP.Receiving(port, newMsgChanRecive)
 	go UDP.Transmitting(port, msg, newMsgChanTransmit)
 	go printMsg(newMsgChanRecive)
-	go changeTransmit(newMsgChanTransmit, msg)
+	go updateTransmit(newMsgChanTransmit, msg)
 
 	for {
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func testDriver() {
-	driver.InitializeElevator()
-	driver.ElevatorSetMotorDirection(1)
-
-	var currentFloor int
-
-	for {
-		currentFloor = driver.ElevatorGetFloorSensorSignal()
-		if currentFloor != -1 {
-			driver.ElevatorSetFloorIndicator(currentFloor)
-		}
-		if currentFloor == 3 {
-			driver.ElevatorSetMotorDirection(1)
-		} else if currentFloor == 0 {
-			driver.ElevatorSetMotorDirection(0)
-		}
-	}
-}
-
 func testQueue() {
 	for{
 		queue.UpdateOrders()
+		queue.UpdateButtonLight()
 	}
 }
 
 func testFSM(){
-	FMS.ElevatorStartUp()
 	var floorNumber int = -1
 	for{
 		floorNumber = driver.ElevatorGetFloorSensorSignal()
 		if floorNumber != -1{
+			FSM.Update()
 			driver.ElevatorSetFloorIndicator(floorNumber)
-			FMS.ElevatorHasArrivedAtFloor(floorNumber)
-			FMS.SetElevetorDirection()
+			FSM.ElevatorHasArrivedAtFloor(floorNumber)
+			FSM.SetElevetorDirection()
 		}
 	}
 }
 
+func handleKill(){
+    c := make(chan os.Signal, 2)
+    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+    <- c
+    driver.ElevatorSetMotorDirection(2)
+    os.Exit(1)
+}
+
 func main() {
 	driver.InitializeElevator()
-	queue.DeleteFile()
+	FSM.ElevatorStartUp()
+	//queue.DeleteFile()
 	go testUDPNetwork()
-	//go testDriver()
 	go testQueue()
 	go testFSM()
 	for {
+		handleKill()
 	}
 }

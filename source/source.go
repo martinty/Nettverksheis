@@ -4,17 +4,17 @@ import (
 	"fmt"
 )
 
+const Elevators int = 3
+
 type ElevInfo struct {
-	ID             string
-	Words          string
-	ElevIP         string
-	CurrentFloor   int
-	Direction      int
-	NumberOrders   int
-	LocalOrders    [4]int
-	ExternalOrders [4][2]int
-	Recipe         bool
-	NewOrder       Order
+	IP         	   		string
+	ID            		string
+	CurrentFloor   		int
+	CurrentDirection    int
+	LocalOrders    		[4]int
+	ExternalOrders 		[4][2]int
+	Recipe         		bool
+	//NewOrder       Order
 }
 
 type Order struct {
