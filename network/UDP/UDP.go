@@ -43,14 +43,14 @@ func Receiving(port string, newMsgChanRecive chan source.ElevInfo) {
 		source.CheckForError(err)
 
 		newMsgChanRecive <- newMsg
-		
+
 	}
 }
 
 func Transmitting(port string, msg source.ElevInfo, newMsgChanTransmit chan source.ElevInfo) {
 
-	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.150"+port) //Skole 3
-	adress, err := net.ResolveUDPAddr("udp", "129.241.187.145"+port) //Skole 17
+	adress, err := net.ResolveUDPAddr("udp", "129.241.187.150"+port) //Skole 3
+	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.145"+port) //Skole 17
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.149"+port) //Skole 2
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.140"+port) //Skole 1
 	//adress, err := net.ResolveUDPAddr("udp", "129.241.187.255"+port) //Skole broadcast

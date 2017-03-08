@@ -1,16 +1,16 @@
 package main
 
 import (
-	"./driver"
 	"./FSM"
+	"./driver"
 	"./network/UDP"
 	"./queue"
 	"./source"
 	//"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
-    "os"
-    "os/signal"
-    "syscall"
 )
 
 func printMsg(newMsgChanRecive chan source.ElevInfo) {
@@ -64,17 +64,17 @@ func testUDPNetwork() {
 }
 
 func testQueue() {
-	for{
+	for {
 		queue.UpdateOrders()
 		queue.UpdateButtonLight()
 	}
 }
 
-func testFSM(){
+func testFSM() {
 	var floorNumber int = -1
-	for{
+	for {
 		floorNumber = driver.ElevatorGetFloorSensorSignal()
-		if floorNumber != -1{
+		if floorNumber != -1 {
 			FSM.Update()
 			driver.ElevatorSetFloorIndicator(floorNumber)
 			FSM.ElevatorHasArrivedAtFloor(floorNumber)
@@ -83,17 +83,18 @@ func testFSM(){
 	}
 }
 
-func handleKill(){
-    c := make(chan os.Signal, 2)
-    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-    <- c
-    driver.ElevatorSetMotorDirection(2)
-    os.Exit(1)
+func handleKill() {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	driver.ElevatorSetMotorDirection(2)
+	os.Exit(1)
 }
 
 func main() {
 	driver.InitializeElevator()
 	FSM.ElevatorStartUp()
+	//go queue.Cost()
 	//queue.DeleteFile()
 	go testUDPNetwork()
 	go testQueue()

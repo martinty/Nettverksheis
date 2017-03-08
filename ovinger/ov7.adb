@@ -18,25 +18,13 @@ procedure ov7 is
     protected body Transaction_Manager is
         entry Finished when Finished_Gate_Open or Finished'Count = N is
         begin
-            if Finished_Gate_Open = False then
-                Finished_Gate_Open := True; 
-            end if;           
-
-            if Aborted = True then
-                Should_Commit := False;
-                       
-
-            else                 
-                Should_Commit := True;
-
-            end if;
-            
-            if Finished'Count = 0 then
-                Finished_Gate_Open := False;
-                Aborted := False;   
-            end if;
             ------------------------------------------
             -- PART 3: Complete the exit protocol here
+            Should_Commit := not Aborted;
+            Finished_Gate_Open := Finished'Count /= 0;
+            if not Finished_Gate_Open then
+                Aborted := False;
+            end if;
             ------------------------------------------
         end Finished;
 
@@ -52,27 +40,22 @@ procedure ov7 is
         
     end Transaction_Manager;
 
-        -------------------------------------------
-        -- PART 1: Create the transaction work here
-        -------------------------------------------
+
+
     
     function Unreliable_Slow_Add (x : Integer) return Integer is
     Error_Rate : Constant := 0.15;  -- (between 0 and 1)
-    error : Float := Random(Gen);
     begin
-        
-        if Error_Rate >= error then
-
-            delay Duration(0.5);
-            raise Count_Failed;
-            return x;
+        -------------------------------------------
+        -- PART 1: Create the transaction work here
+        if Random(Gen) > Error_Rate then
+            delay Duration(3.5 + Random(Gen));
+            return x + 10;
         else
-            delay Duration(4);
-            return x +10;
+            delay Duration(0.5 * Random(Gen));
+            raise Count_Failed;
         end if;
-
-
-       
+        -------------------------------------------
     end Unreliable_Slow_Add;
 
 
@@ -87,32 +70,29 @@ procedure ov7 is
         Put_Line ("Worker" & Integer'Image(Initial) & " started");
 
         loop
-            
-            begin
-                Round_Num := Round_Num + 1;
-                Put_Line ("Worker" & Integer'Image(Initial) & " started round" & Integer'Image(Round_Num));
-                Num := Unreliable_Slow_Add(Num);
-                exception
-                    when Count_Failed =>
-                        Manager.Signal_Abort;
-            end;
+            Put_Line ("Worker" & Integer'Image(Initial) & " started round" & Integer'Image(Round_Num));
+            Round_Num := Round_Num + 1;
 
-                    
-            ---------------------------------------
-            -- PART 2: Do the transaction work here             
-            ---------------------------------------
+            -------------------------------------------
+            -- PART 2: Do the transaction work here
+            begin
+                Num := Unreliable_Slow_Add(Prev);
+            exception
+                when Count_Failed =>
+                    Manager.Signal_Abort;
+            end;
             Manager.Finished;
+            -------------------------------------------
+
             if Manager.Commit = True then
                 Put_Line ("  Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
-                
-            else 
+            else
                 Put_Line ("  Worker" & Integer'Image(Initial) &
                              " reverting from" & Integer'Image(Num) &
                              " to" & Integer'Image(Prev));
-                Num:= Prev;
-                
                 -------------------------------------------
                 -- PART 2: Roll back to previous value here
+                Num := Prev;
                 -------------------------------------------
             end if;
 
@@ -131,5 +111,3 @@ procedure ov7 is
 begin
     Reset(Gen); -- Seed the random number generator
 end ov7;
-
-

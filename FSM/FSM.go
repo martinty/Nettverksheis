@@ -11,6 +11,7 @@ import (
 const (
 	Idle = iota
 	Running
+	Stuck
 )
 
 var arrivedFloor int = -1
@@ -34,13 +35,13 @@ func ElevatorStartUp() {
 	fmt.Println("Elevator ready")
 }
 
-func ElevatorHasArrivedAtFloor(floorNumber int){
-	switch(elevatorState){
+func ElevatorHasArrivedAtFloor(floorNumber int) {
+	switch elevatorState {
 	case Running:
 		arrivedFloor = floorNumber
-		if arrivedFloor != currentFloor{
+		if arrivedFloor != currentFloor {
 			currentFloor = arrivedFloor
-			if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection){
+			if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
 				driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
 				timer()
 				queue.ClearOrdersAtFloor(currentFloor)
@@ -49,7 +50,7 @@ func ElevatorHasArrivedAtFloor(floorNumber int){
 		}
 		break
 	case Idle:
-		if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection){
+		if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
 			timer()
 			queue.ClearOrdersAtFloor(currentFloor)
 		}
@@ -60,22 +61,22 @@ func ElevatorHasArrivedAtFloor(floorNumber int){
 }
 
 func SetElevetorDirection() {
-	switch(elevatorState){
-		case Idle:
-			if queue.CheckIfOrderTableIsEmpty(){
-				break
-			} else{
-				currentDirection = queue.GetMotorDirection(currentFloor, currentDirection)
-				driver.ElevatorSetMotorDirection(currentDirection)
-				elevatorState = Running
-				break				
-			}
-		default:
+	switch elevatorState {
+	case Idle:
+		if queue.CheckIfOrderTableIsEmpty() {
 			break
+		} else {
+			currentDirection = queue.GetMotorDirection(currentFloor, currentDirection)
+			driver.ElevatorSetMotorDirection(currentDirection)
+			elevatorState = Running
+			break
+		}
+	default:
+		break
 	}
 }
 
-func timer(){
+func timer() {
 	Update()
 	DoorOpenTimer := time.NewTimer(time.Second * 3)
 	driver.ElevatorSetDoorOpenLamp(true)
@@ -83,7 +84,7 @@ func timer(){
 	driver.ElevatorSetDoorOpenLamp(false)
 }
 
-func Update(){
+func Update() {
 	queue.UpdateElevatorDirection(currentDirection)
 	queue.UpdateElevatorFloor(currentFloor)
 }

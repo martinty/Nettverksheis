@@ -8,71 +8,55 @@ procedure ov8 is
 
     protected type Transaction_Manager (N : Positive) is
         entry Finished;
-        entry wait_until_aborted;
-        function Commit return Boolean;
+        entry Wait_Until_Aborted;
         procedure Signal_Abort;
     private
-    --    wait_until_aborted_Gate_Open : Boolean := False;
         Finished_Gate_Open  : Boolean := False;
         Aborted             : Boolean := False;
-        Should_Commit       : Boolean := True;
     end Transaction_Manager;
-
     protected body Transaction_Manager is
-        
-        entry wait_until_aborted when Aborted = True is
-        begin
-        
-            if wait_until_aborted'Count = 0 then
-                    Aborted := False; 
-            end if;
-        end wait_until_aborted;
-
-
         entry Finished when Finished_Gate_Open or Finished'Count = N is
         begin
-            if Finished_Gate_Open = False then
-                Finished_Gate_Open := True; 
-            end if;           
-
-            
-            if Finished'Count = 0 then
-                Finished_Gate_Open := False;
-                Put_Line("Round complete");
+            ------------------------------------------
+            -- PART 3: Modify the Finished entry
+            Finished_Gate_Open := Finished'Count /= 0;
+            if not Finished_Gate_Open then
+                Aborted := False;
             end if;
+            ------------------------------------------
         end Finished;
 
+        -------------------------------------------
+        -- PART 2: Wait_Until_Aborted
+        entry Wait_Until_Aborted when Aborted is
+        begin 
+            if Wait_Until_Aborted'Count = 0 then
+                Aborted := False;
+            end if;
+        end; 
+        -------------------------------------------
 
         procedure Signal_Abort is
         begin
             Aborted := True;
         end Signal_Abort;
 
-        function Commit return Boolean is
-        begin
-            return Should_Commit;
-        end Commit;
         
     end Transaction_Manager;
 
-        -------------------------------------------
-        -- PART 1: Create the transaction work here
-        -------------------------------------------
+
+
     
-   
     function Unreliable_Slow_Add (x : Integer) return Integer is
     Error_Rate : Constant := 0.15;  -- (between 0 and 1)
-    error : Float := Random(Gen);
-    
     begin
-        if Error_Rate >= error then
-            delay Duration(0.5);
-            raise Count_Failed;
+        if Random(Gen) > Error_Rate then
+            delay Duration(3.5 + Random(Gen));
+            return x + 10;
         else
-            delay Duration(4);
-            return x +10;
+            delay Duration(0.5 * Random(Gen));
+            raise Count_Failed;
         end if;
-
     end Unreliable_Slow_Add;
 
 
@@ -87,31 +71,29 @@ procedure ov8 is
         Put_Line ("Worker" & Integer'Image(Initial) & " started");
 
         loop
-            begin
-             Round_Num := Round_Num + 1;
-             select
-                Manager.wait_until_aborted;
-                Num := Num+5;
-                Put_Line ("  Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
+            Put_Line ("Worker" & Integer'Image(Initial) & " started round" & Integer'Image(Round_Num));
+            Round_Num := Round_Num + 1;
 
+            -------------------------------------------
+            -- PART 1: Select-Then-Abort
+            select
+                Manager.Wait_Until_Aborted;
+                Num := Prev + 5;
+                Put_Line ("  Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
             then abort
-                
                 begin
-                Put_Line ("Worker" & Integer'Image(Initial) & " started round" & Integer'Image(Round_Num));
-                Num := Unreliable_Slow_Add(Num);
-                exception 
+                    Num := Unreliable_Slow_Add(Prev);
+                    Put_Line ("  Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
+                exception
                     when Count_Failed =>
                         Manager.Signal_Abort;
                 end;
                 Manager.Finished;
-                Put_Line ("  Worker" & Integer'Image(Initial) & " comitting" & Integer'Image(Num));
-        
             end select;
-
-            end;
-
+  
+            Prev := Num;
             delay 0.5;
-
+	        -------------------------------------------	
         end loop;
     end Transaction_Worker;
 
@@ -124,5 +106,3 @@ procedure ov8 is
 begin
     Reset(Gen); -- Seed the random number generator
 end ov8;
-
-
