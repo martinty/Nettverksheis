@@ -12,8 +12,8 @@ type ElevInfo struct {
 	CurrentFloor     int
 	CurrentDirection int
 	State            int
-	LocalOrders      [4]int
-	ExternalOrders   [4][2]int
+	LocalOrders      [4]string
+	ExternalOrders   [4][2]string
 	Recipe           bool
 	//NewOrder       Order
 }

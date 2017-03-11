@@ -9,17 +9,27 @@ import (
 	//"time"
 )
 
-var orderTable [4][3]int
+var orderTable [4][3]string
+var externalOrders [4][2]string
 var elevatorDirection int = -1
 var elevatorFloor int = -1
+var elevatorState int = -1
+var elevatorID string
 
 var infoTable map[string]source.ElevInfo
+
+const (
+	Idle = iota
+	Running
+	Stuck
+)
 
 const cost = 10
 
 func Init() {
 	infoTable = make(map[string]source.ElevInfo)
 	var info source.ElevInfo = ReadFromFile()
+	elevatorID = info.ID
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
 			if button == driver.ButtonTypeCommand {
@@ -31,36 +41,90 @@ func Init() {
 	}
 }
 
-/*
-func Cost(floor int, button int) {
+func Cost(floor int, button int) string {
 	minCost := cost * 2 * driver.NumFloors
-	ID := ""
+	minCostID := ""
 
-	for {
-		for key := range infoTable {
-			tempCost := 0
-			elevator := infoTable[key]
-			currentFloor := elevator.CurrentFloor
-			currentDirection := elevator.CurrentDirection
-			elevatorState := elevator.State
+	for key := range infoTable {
+
+		tempCost := 0
+		dir := 0
+		buttonDirection := 0
+		elevator := infoTable[key]
+		floorNumber := elevator.CurrentFloor
+
+		if elevator.CurrentDirection == driver.MotorDirectionUp {
+			dir = 1
+		} else {
+			dir = -1
 		}
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-*/
 
-func UpdateInfoTable(msg source.ElevInfo) {
-	infoTable[msg.ID] = msg
-	fmt.Println(infoTable)
+		if button == driver.ButtonTypeUp {
+			buttonDirection = 1
+		} else {
+			buttonDirection = -1
+		}
+
+		if elevator.State == Stuck {
+			continue
+		} else if elevator.State == Idle && floorNumber == floor {
+			tempCost = 0
+		} else {
+			if floorNumber == driver.NumFloors-1 {
+				dir = -1
+			} else if floorNumber == 0 {
+				dir = 1
+			}
+			for {
+				if floorNumber == floor && dir == buttonDirection {
+					break
+				} else if floorNumber == driver.NumFloors-1 {
+					if floorNumber == floor {
+						break
+					}
+					dir = -1
+				} else if floorNumber == 0 {
+					if floorNumber == floor {
+						break
+					}
+					dir = 1
+				}
+				floorNumber += dir
+				tempCost += cost
+			}
+		}
+		if tempCost < minCost {
+			minCost = tempCost
+			minCostID = key
+		}
+	}
+	return minCostID
 }
 
 func UpdateOrders() {
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
 			if driver.ElevatorCheckButtonSignal(button, floor) {
-				if orderTable[floor][button] == 0 {
-					orderTable[floor][button] = 1
+				if orderTable[floor][button] == "" {
+					if button == driver.ButtonTypeCommand {
+						orderTable[floor][button] = elevatorID
+					} else {
+						ID := Cost(floor, button)
+						externalOrders[floor][button] = ID
+					}
 				}
+			}
+		}
+	}
+}
+
+func UpdateTables(msg source.ElevInfo) {
+	infoTable[msg.ID] = msg
+	fmt.Println(infoTable)
+	for floor := 0; floor < driver.NumFloors; floor++ {
+		for button := 0; button < driver.NumButtons-1; button++ {
+			if orderTable[floor][button] == "" {
+				orderTable[floor][button] = msg.ExternalOrders[floor][button]
 			}
 		}
 	}
@@ -70,14 +134,15 @@ func UpdateElevatorInfo(msg source.ElevInfo) source.ElevInfo {
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
 			if button == driver.ButtonTypeCommand {
-				msg.LocalOrders[floor] = orderTable[floor][driver.ButtonTypeCommand]
+				msg.LocalOrders[floor] = orderTable[floor][button]
 			} else {
-				msg.ExternalOrders[floor][button] = orderTable[floor][button]
+				msg.ExternalOrders[floor][button] = externalOrders[floor][button]
 			}
 		}
 	}
 	msg.CurrentDirection = elevatorDirection
 	msg.CurrentFloor = elevatorFloor
+	msg.State = elevatorState
 	return msg
 }
 
@@ -89,14 +154,18 @@ func UpdateElevatorDirection(direction int) {
 	elevatorDirection = direction
 }
 
+func UpdateElevatorState(state int) {
+	elevatorState = state
+}
+
 func DeleteOrder(button int, floor int) {
-	orderTable[floor][button] = 0
+	orderTable[floor][button] = ""
 }
 
 func UpdateButtonLight() {
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
-			if orderTable[floor][button] != 0 {
+			if orderTable[floor][button] != "" {
 				driver.ElevatorSetButtonLamp(button, floor, true)
 			} else {
 				driver.ElevatorSetButtonLamp(button, floor, false)
@@ -113,7 +182,7 @@ func GetMotorDirection(currentFloor int, currentDirection int) int {
 	} else if currentDirection == driver.MotorDirectionDown {
 		for floor := 0; floor < currentFloor; floor++ {
 			for button := 0; button < driver.NumButtons; button++ {
-				if orderTable[floor][button] == 1 {
+				if orderTable[floor][button] == elevatorID {
 					return driver.MotorDirectionDown
 				}
 			}
@@ -122,7 +191,7 @@ func GetMotorDirection(currentFloor int, currentDirection int) int {
 	} else if currentDirection == driver.MotorDirectionUp {
 		for floor := currentFloor + 1; floor < driver.NumFloors; floor++ {
 			for button := 0; button < driver.NumButtons; button++ {
-				if orderTable[floor][button] == 1 {
+				if orderTable[floor][button] == elevatorID {
 					return driver.MotorDirectionUp
 				}
 			}
@@ -134,34 +203,34 @@ func GetMotorDirection(currentFloor int, currentDirection int) int {
 }
 
 func ShouldElevatorStopAtFloor(currentFloor int, currentDirection int) bool {
-	if orderTable[currentFloor][driver.ButtonTypeCommand] == 1 {
+	if orderTable[currentFloor][driver.ButtonTypeCommand] == elevatorID {
 		return true
-	} else if orderTable[currentFloor][currentDirection] == 1 {
+	} else if orderTable[currentFloor][currentDirection] == elevatorID {
 		return true
-	} else if currentFloor == driver.NumFloors && orderTable[currentFloor][driver.ButtonTypeDown] == 1 {
+	} else if currentFloor == driver.NumFloors && orderTable[currentFloor][driver.ButtonTypeDown] == elevatorID {
 		return true
-	} else if currentFloor == 0 && orderTable[currentFloor][driver.ButtonTypeUp] == 1 {
+	} else if currentFloor == 0 && orderTable[currentFloor][driver.ButtonTypeUp] == elevatorID {
 		return true
 	} else if currentDirection == driver.MotorDirectionUp {
 		for floor := currentFloor + 1; floor < driver.NumFloors; floor++ {
 			for button := 0; button < driver.NumButtons; button++ {
-				if orderTable[floor][button] == 1 {
+				if orderTable[floor][button] == elevatorID {
 					return false
 				}
 			}
 		}
-		if orderTable[currentFloor][driver.ButtonTypeDown] == 1 {
+		if orderTable[currentFloor][driver.ButtonTypeDown] == elevatorID {
 			return true
 		}
 	} else if currentDirection == driver.MotorDirectionDown {
 		for floor := 0; floor < currentFloor; floor++ {
 			for button := 0; button < driver.NumButtons; button++ {
-				if orderTable[floor][button] == 1 {
+				if orderTable[floor][button] == elevatorID {
 					return false
 				}
 			}
 		}
-		if orderTable[currentFloor][driver.ButtonTypeUp] == 1 {
+		if orderTable[currentFloor][driver.ButtonTypeUp] == elevatorID {
 			return true
 		}
 	}
@@ -170,14 +239,17 @@ func ShouldElevatorStopAtFloor(currentFloor int, currentDirection int) bool {
 
 func ClearOrdersAtFloor(currentFloor int) {
 	for button := 0; button < driver.NumButtons; button++ {
-		orderTable[currentFloor][button] = 0
+		orderTable[currentFloor][button] = ""
+		if button != driver.ButtonTypeCommand {
+			externalOrders[currentFloor][button] = ""
+		}
 	}
 }
 
 func CheckIfOrderTableIsEmpty() bool {
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
-			if orderTable[floor][button] != 0 {
+			if orderTable[floor][button] == elevatorID {
 				return false
 			}
 		}

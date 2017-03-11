@@ -19,7 +19,7 @@ func printMsg(newMsgChanRecive chan source.ElevInfo) {
 	for {
 		recievedMsg = <-newMsgChanRecive
 		queue.WriteToFile(recievedMsg)
-		queue.UpdateInfoTable(recievedMsg)
+		queue.UpdateTables(recievedMsg)
 		//fmt.Println(recievedMsg)
 	}
 }
@@ -43,7 +43,7 @@ func testUDPNetwork() {
 	newMsgChanRecive := make(chan source.ElevInfo, 1)
 	newMsgChanTransmit := make(chan source.ElevInfo, 1)
 
-	port := ":20017"
+	port := ":20007"
 
 	if queue.CreateFile() {
 		msg.IP = UDP.GetLocalIP()
@@ -73,9 +73,11 @@ func testQueue() {
 func testFSM() {
 	var floorNumber int = -1
 	for {
+		FSM.UpdateElevator()
 		floorNumber = driver.ElevatorGetFloorSensorSignal()
+		FSM.CheckIfElevatorIsStuck(floorNumber)
+
 		if floorNumber != -1 {
-			FSM.Update()
 			driver.ElevatorSetFloorIndicator(floorNumber)
 			FSM.ElevatorHasArrivedAtFloor(floorNumber)
 			FSM.SetElevetorDirection()
@@ -92,13 +94,34 @@ func handleKill() {
 }
 
 func main() {
+
+	//queue.DeleteFile()
+
+	var msg source.ElevInfo
+
+	newMsgChanRecive := make(chan source.ElevInfo, 1)
+	newMsgChanTransmit := make(chan source.ElevInfo, 1)
+
+	port := ":20007"
+
+	if queue.CreateFile() {
+		msg.IP = UDP.GetLocalIP()
+		msg.ID = UDP.GetLocalID(msg.IP)
+		queue.WriteToFile(msg)
+	} else {
+		msg = queue.ReadFromFile()
+	}
+
 	driver.InitializeElevator()
 	FSM.ElevatorStartUp()
-	//go queue.Cost()
-	//queue.DeleteFile()
-	go testUDPNetwork()
+
+	go UDP.Receiving(port, newMsgChanRecive)
+	go UDP.Transmitting(port, msg, newMsgChanTransmit)
+	go printMsg(newMsgChanRecive)
+	go updateTransmit(newMsgChanTransmit, msg)
 	go testQueue()
 	go testFSM()
+
 	for {
 		handleKill()
 	}

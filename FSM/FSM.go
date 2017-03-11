@@ -19,6 +19,8 @@ var currentFloor int = -1
 var elevatorState int = -1
 var currentDirection int = -1
 
+var stuckTimer = time.Now().Add(100 * time.Second)
+
 func ElevatorStartUp() {
 	fmt.Println("Elevator init")
 	driver.ElevatorSetDoorOpenLamp(false)
@@ -31,7 +33,7 @@ func ElevatorStartUp() {
 	currentDirection = driver.MotorDirectionDown
 	elevatorState = Idle
 	queue.Init()
-	Update()
+	UpdateElevator()
 	fmt.Println("Elevator ready")
 }
 
@@ -43,15 +45,16 @@ func ElevatorHasArrivedAtFloor(floorNumber int) {
 			currentFloor = arrivedFloor
 			if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
 				driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
-				timer()
-				queue.ClearOrdersAtFloor(currentFloor)
 				elevatorState = Idle
+				UpdateElevator()
+				doorTimer()
+				queue.ClearOrdersAtFloor(currentFloor)
 			}
 		}
 		break
 	case Idle:
 		if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
-			timer()
+			doorTimer()
 			queue.ClearOrdersAtFloor(currentFloor)
 		}
 		break
@@ -69,6 +72,7 @@ func SetElevetorDirection() {
 			currentDirection = queue.GetMotorDirection(currentFloor, currentDirection)
 			driver.ElevatorSetMotorDirection(currentDirection)
 			elevatorState = Running
+			StartStuckTimer()
 			break
 		}
 	default:
@@ -76,15 +80,46 @@ func SetElevetorDirection() {
 	}
 }
 
-func timer() {
-	Update()
+func CheckIfElevatorIsStuck(floorNumber int) {
+	switch elevatorState {
+	case Running:
+		if floorNumber != -1 && floorNumber != currentFloor {
+			StartStuckTimer()
+		}
+		CheckStuckTimer()
+		break
+	case Stuck:
+		if floorNumber != -1 && floorNumber != currentFloor {
+			elevatorState = Running
+			StartStuckTimer()
+		}
+		break
+	default:
+		break
+	}
+}
+
+func doorTimer() {
 	DoorOpenTimer := time.NewTimer(time.Second * 3)
 	driver.ElevatorSetDoorOpenLamp(true)
 	<-DoorOpenTimer.C
 	driver.ElevatorSetDoorOpenLamp(false)
 }
 
-func Update() {
+func StartStuckTimer() {
+	currentTime := time.Now()
+	stuckTimer = currentTime.Add(5 * time.Second)
+}
+
+func CheckStuckTimer() {
+	currentTime := time.Now()
+	if currentTime.After(stuckTimer) {
+		elevatorState = Stuck
+	}
+}
+
+func UpdateElevator() {
 	queue.UpdateElevatorDirection(currentDirection)
 	queue.UpdateElevatorFloor(currentFloor)
+	queue.UpdateElevatorState(elevatorState)
 }
