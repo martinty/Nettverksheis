@@ -1,7 +1,7 @@
 
-scp -r gr26 student@129.241.187.146:~/gr26_1/ - Lagrer en mappe på annen pc med filene i mappen gr26. 
+scp -r gr26 student@129.241.187.142:~/gr26/ - Lagrer en mappe på annen pc med filene i mappen gr26. 
 
-ssh student@129.241.187.146 - Koble til annen PC
+ssh student@129.241.187.142 - Koble til annen PC
 
 mkdir "navn" - Oppretter en mappe med navn "navn"
 

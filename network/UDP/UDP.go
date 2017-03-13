@@ -4,6 +4,7 @@ import (
 	"../../source"
 	"encoding/json"
 	//"fmt"
+	//"math/rand"
 	"net"
 	"strings"
 	"time"
@@ -35,15 +36,12 @@ func Receiving(port string, newMsgChanRecive chan source.ElevInfo) {
 		n, _, err := connection.ReadFromUDP(recieveBuffer)
 		source.CheckForError(err)
 
-		//ID := string(recieveBuffer[7:15])
-
 		var newMsg source.ElevInfo
 
 		err = json.Unmarshal(recieveBuffer[:n], &newMsg)
 		source.CheckForError(err)
 
 		newMsgChanRecive <- newMsg
-
 	}
 }
 
@@ -74,6 +72,6 @@ func Transmitting(port string, msg source.ElevInfo, newMsgChanTransmit chan sour
 			_, err = connection.Write(buf)
 			source.CheckForError(err)
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 }

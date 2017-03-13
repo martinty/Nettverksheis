@@ -10,67 +10,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
+	//"time"
 )
 
-func printMsg(newMsgChanRecive chan source.ElevInfo) {
-
-	var recievedMsg source.ElevInfo
-	for {
-		recievedMsg = <-newMsgChanRecive
-		queue.WriteToFile(recievedMsg)
-		queue.UpdateTables(recievedMsg)
-		//fmt.Println(recievedMsg)
-	}
-}
-
-func updateTransmit(newMsgChanTransmit chan source.ElevInfo, msg source.ElevInfo) {
-
-	for {
-		msg = queue.UpdateElevatorInfo(msg)
-		select {
-		case newMsgChanTransmit <- msg:
-			continue
-		default:
-			continue
-		}
-	}
-}
-
-func testUDPNetwork() {
-	var msg source.ElevInfo
-
-	newMsgChanRecive := make(chan source.ElevInfo, 1)
-	newMsgChanTransmit := make(chan source.ElevInfo, 1)
-
-	port := ":20007"
-
-	if queue.CreateFile() {
-		msg.IP = UDP.GetLocalIP()
-		msg.ID = UDP.GetLocalID(msg.IP)
-		queue.WriteToFile(msg)
-	} else {
-		msg = queue.ReadFromFile()
-	}
-
-	go UDP.Receiving(port, newMsgChanRecive)
-	go UDP.Transmitting(port, msg, newMsgChanTransmit)
-	go printMsg(newMsgChanRecive)
-	go updateTransmit(newMsgChanTransmit, msg)
-
-	for {
-		time.Sleep(1 * time.Second)
-	}
-}
-
-func testQueue() {
-	for {
-		queue.UpdateOrders()
-		queue.UpdateButtonLight()
-	}
-}
-
-func testFSM() {
+func runFSM(deleteOrderChan chan source.Order) {
 	var floorNumber int = -1
 	for {
 		FSM.UpdateElevator()
@@ -79,8 +22,8 @@ func testFSM() {
 
 		if floorNumber != -1 {
 			driver.ElevatorSetFloorIndicator(floorNumber)
-			FSM.ElevatorHasArrivedAtFloor(floorNumber)
-			FSM.SetElevetorDirection()
+			FSM.ElevatorHasArrivedAtFloor(floorNumber, deleteOrderChan)
+			FSM.CheckFloorAndSetElevetorDirection(deleteOrderChan)
 		}
 	}
 }
@@ -101,12 +44,14 @@ func main() {
 
 	newMsgChanRecive := make(chan source.ElevInfo, 1)
 	newMsgChanTransmit := make(chan source.ElevInfo, 1)
+	newOrderChan := make(chan source.Order, 10)       // <- Kan tune det taller her
+	deleteOrderChan := make(chan source.Order, 10)    // <- Kan tune det taller her
+	deleteAddOrderChan := make(chan source.Order, 10) // <- Kan tune det taller her
 
-	port := ":20007"
+	port := ":20013"
 
 	if queue.CreateFile() {
-		msg.IP = UDP.GetLocalIP()
-		msg.ID = UDP.GetLocalID(msg.IP)
+		msg.ID = UDP.GetLocalID(UDP.GetLocalIP())
 		queue.WriteToFile(msg)
 	} else {
 		msg = queue.ReadFromFile()
@@ -114,13 +59,14 @@ func main() {
 
 	driver.InitializeElevator()
 	FSM.ElevatorStartUp()
+	queue.Init()
 
 	go UDP.Receiving(port, newMsgChanRecive)
 	go UDP.Transmitting(port, msg, newMsgChanTransmit)
-	go printMsg(newMsgChanRecive)
-	go updateTransmit(newMsgChanTransmit, msg)
-	go testQueue()
-	go testFSM()
+	go queue.UpdateOrdersAfterReceiving(newMsgChanRecive, deleteAddOrderChan)
+	go queue.UpdateElevatorInfoBeforeTransmitting(newMsgChanTransmit, newOrderChan, deleteOrderChan, deleteAddOrderChan, msg)
+	go queue.CheckForOrdersAndDistribute(newOrderChan)
+	go runFSM(deleteOrderChan)
 
 	for {
 		handleKill()

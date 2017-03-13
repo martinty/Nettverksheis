@@ -8,6 +8,7 @@ git remote add origin https://github.com/martinty/heis.git
 git push origin master
 
 # pull from github
+git init
 git pull https://github.com/martinty/heis.git 
 
 # clone from github

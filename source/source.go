@@ -4,25 +4,23 @@ import (
 	"fmt"
 )
 
-const Elevators int = 3
-
 type ElevInfo struct {
-	IP               string
 	ID               string
 	CurrentFloor     int
 	CurrentDirection int
-	State            int
+	State            string
 	LocalOrders      [4]string
 	ExternalOrders   [4][2]string
-	Recipe           bool
-	//NewOrder       Order
+	NewOrder         Order
+	DeleteOrder      Order
+	DeleteAddOrder   Order
 }
 
 type Order struct {
-	ID       string
-	Words    string
-	Position [2]int
-	ElevIP   string
+	Command string
+	Floor   int
+	Button  int
+	ElevID  string
 }
 
 func CheckForError(err error) {

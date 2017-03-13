@@ -6,28 +6,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	//"time"
+	"sync"
+	"time"
 )
 
 var orderTable [4][3]string
-var externalOrders [4][2]string
 var elevatorDirection int = -1
 var elevatorFloor int = -1
-var elevatorState int = -1
-var elevatorID string
+var elevatorState string = ""
+var elevatorID string = ""
 
 var infoTable map[string]source.ElevInfo
+var offlineTimer map[string]int64
+var orderTimer map[int]int64
+var mutex sync.Mutex
 
 const (
-	Idle = iota
-	Running
-	Stuck
+	Idle     = "Idle    "
+	Running  = "Running "
+	DoorOpen = "DoorOpen"
+	Stuck    = "Stuck   "
 )
 
 const cost = 10
 
 func Init() {
 	infoTable = make(map[string]source.ElevInfo)
+	offlineTimer = make(map[string]int64)
+	orderTimer = make(map[int]int64)
 	var info source.ElevInfo = ReadFromFile()
 	elevatorID = info.ID
 	for floor := 0; floor < driver.NumFloors; floor++ {
@@ -41,22 +47,30 @@ func Init() {
 	}
 }
 
-func Cost(floor int, button int) string {
+func calculateCost(floor int, button int) string {
 	minCost := cost * 2 * driver.NumFloors
 	minCostID := ""
+	mutex.Lock()
 
 	for key := range infoTable {
-
 		tempCost := 0
 		dir := 0
 		buttonDirection := 0
 		elevator := infoTable[key]
 		floorNumber := elevator.CurrentFloor
 
-		if elevator.CurrentDirection == driver.MotorDirectionUp {
-			dir = 1
-		} else {
-			dir = -1
+		if elevator.State == Stuck {
+			continue
+		} else if elevator.LocalOrders[floor] == key || elevator.ExternalOrders[floor][0] == key || elevator.ExternalOrders[floor][1] == key {
+			minCost = 0
+			minCostID = key
+			break
+		} else if floorNumber == floor {
+			if elevator.State == Idle || elevator.State == DoorOpen {
+				minCost = 0
+				minCostID = key
+				break
+			}
 		}
 
 		if button == driver.ButtonTypeUp {
@@ -65,15 +79,25 @@ func Cost(floor int, button int) string {
 			buttonDirection = -1
 		}
 
-		if elevator.State == Stuck {
-			continue
-		} else if elevator.State == Idle && floorNumber == floor {
-			tempCost = 0
+		if floorNumber == driver.NumFloors-1 {
+			dir = -1
+		} else if floorNumber == 0 {
+			dir = 1
+		} else if elevator.CurrentDirection == driver.MotorDirectionUp {
+			dir = 1
 		} else {
-			if floorNumber == driver.NumFloors-1 {
-				dir = -1
-			} else if floorNumber == 0 {
-				dir = 1
+			dir = -1
+		}
+
+		if elevator.State == Idle {
+			tempCost = (elevator.CurrentFloor - floor) * cost
+			if tempCost < 0 {
+				tempCost = -tempCost
+			}
+		} else {
+			if elevator.State == Running {
+				floorNumber += dir
+				tempCost += cost
 			}
 			for {
 				if floorNumber == floor && dir == buttonDirection {
@@ -98,52 +122,128 @@ func Cost(floor int, button int) string {
 			minCostID = key
 		}
 	}
+	mutex.Unlock()
 	return minCostID
 }
 
-func UpdateOrders() {
-	for floor := 0; floor < driver.NumFloors; floor++ {
-		for button := 0; button < driver.NumButtons; button++ {
-			if driver.ElevatorCheckButtonSignal(button, floor) {
-				if orderTable[floor][button] == "" {
-					if button == driver.ButtonTypeCommand {
-						orderTable[floor][button] = elevatorID
-					} else {
-						ID := Cost(floor, button)
-						externalOrders[floor][button] = ID
+func CheckForOrdersAndDistribute(newOrderChan chan source.Order) {
+	var newOrder source.Order
+	for {
+		for floor := 0; floor < driver.NumFloors; floor++ {
+			for button := 0; button < driver.NumButtons; button++ {
+				if driver.ElevatorCheckButtonSignal(button, floor) {
+					if orderTable[floor][button] == "" {
+						if button == driver.ButtonTypeCommand {
+							orderTable[floor][button] = elevatorID
+							UpdateButtonLight()
+						} else {
+							ID := calculateCost(floor, button)
+							newOrder.Command = "add"
+							newOrder.Floor = floor
+							newOrder.Button = button
+							newOrder.ElevID = ID
+							newOrderChan <- newOrder
+						}
 					}
 				}
 			}
 		}
+		//time.Sleep(2 * time.Millisecond)
 	}
 }
 
-func UpdateTables(msg source.ElevInfo) {
-	infoTable[msg.ID] = msg
-	fmt.Println(infoTable)
-	for floor := 0; floor < driver.NumFloors; floor++ {
-		for button := 0; button < driver.NumButtons-1; button++ {
-			if orderTable[floor][button] == "" {
-				orderTable[floor][button] = msg.ExternalOrders[floor][button]
+func UpdateElevatorInfoBeforeTransmitting(newMsgChanTransmit chan source.ElevInfo, newOrderChan chan source.Order, deleteOrderChan chan source.Order, deleteAddOrderChan chan source.Order, msg source.ElevInfo) {
+	for {
+		for floor := 0; floor < driver.NumFloors; floor++ {
+			for button := 0; button < driver.NumButtons; button++ {
+				if button == driver.ButtonTypeCommand {
+					msg.LocalOrders[floor] = orderTable[floor][button]
+				} else {
+					msg.ExternalOrders[floor][button] = orderTable[floor][button]
+				}
 			}
+		}
+		msg.CurrentDirection = elevatorDirection
+		msg.CurrentFloor = elevatorFloor
+		msg.State = elevatorState
+
+		select {
+		case msg.NewOrder = <-newOrderChan:
+		default:
+			msg.NewOrder.Command = "none"
+		}
+
+		select {
+		case msg.DeleteOrder = <-deleteOrderChan:
+		default:
+			break
+		}
+
+		select {
+		case msg.DeleteAddOrder = <-deleteAddOrderChan:
+		default:
+			msg.DeleteAddOrder.Command = "none"
+		}
+
+		WriteToFile(msg)
+		newMsgChanTransmit <- msg
+	}
+}
+
+func UpdateOrdersAfterReceiving(newMsgChanRecive chan source.ElevInfo, deleteAddOrderChan chan source.Order) {
+	var recievedMsg source.ElevInfo
+	for {
+		recievedMsg = <-newMsgChanRecive
+		if recievedMsg.NewOrder.Command == "add" {
+			orderTable[recievedMsg.NewOrder.Floor][recievedMsg.NewOrder.Button] = recievedMsg.NewOrder.ElevID
+			UpdateButtonLight()
+		}
+		if recievedMsg.DeleteOrder.Command == "delete" {
+			ClearOrdersAtFloor(recievedMsg.DeleteOrder.Floor, recievedMsg.ID)
+			UpdateButtonLight()
+		}
+		if recievedMsg.DeleteAddOrder.Command == "delete+add" {
+			orderTable[recievedMsg.NewOrder.Floor][recievedMsg.DeleteAddOrder.Button] = recievedMsg.DeleteAddOrder.ElevID
+			UpdateButtonLight()
+		}
+
+		mutex.Lock()
+		infoTable[recievedMsg.ID] = recievedMsg
+		fmt.Println(infoTable)
+		mutex.Unlock()
+
+		offlineTimer[recievedMsg.ID] = time.Now().Unix()
+		for key := range offlineTimer {
+			if time.Now().Unix()-offlineTimer[key] >= 2 {
+				mutex.Lock()
+				delete(infoTable, key)
+				mutex.Unlock()
+				redistributeOrders(key, deleteAddOrderChan)
+			}
+		}
+		if recievedMsg.State == Stuck {
+
+			redistributeOrders(recievedMsg.ID, deleteAddOrderChan)
 		}
 	}
 }
 
-func UpdateElevatorInfo(msg source.ElevInfo) source.ElevInfo {
+func redistributeOrders(ID string, deleteAddOrderChan chan source.Order) {
+	var deleteAddOrder source.Order
 	for floor := 0; floor < driver.NumFloors; floor++ {
 		for button := 0; button < driver.NumButtons; button++ {
-			if button == driver.ButtonTypeCommand {
-				msg.LocalOrders[floor] = orderTable[floor][button]
-			} else {
-				msg.ExternalOrders[floor][button] = externalOrders[floor][button]
+			if button != driver.ButtonTypeCommand {
+				if orderTable[floor][button] == ID {
+					newID := calculateCost(floor, button)
+					deleteAddOrder.Command = "delete+add"
+					deleteAddOrder.Floor = floor
+					deleteAddOrder.Button = button
+					deleteAddOrder.ElevID = newID
+					deleteAddOrderChan <- deleteAddOrder
+				}
 			}
 		}
 	}
-	msg.CurrentDirection = elevatorDirection
-	msg.CurrentFloor = elevatorFloor
-	msg.State = elevatorState
-	return msg
 }
 
 func UpdateElevatorFloor(floor int) {
@@ -154,12 +254,8 @@ func UpdateElevatorDirection(direction int) {
 	elevatorDirection = direction
 }
 
-func UpdateElevatorState(state int) {
+func UpdateElevatorState(state string) {
 	elevatorState = state
-}
-
-func DeleteOrder(button int, floor int) {
-	orderTable[floor][button] = ""
 }
 
 func UpdateButtonLight() {
@@ -172,6 +268,15 @@ func UpdateButtonLight() {
 			}
 		}
 	}
+}
+
+func ClearOrdersAtFloor(currentFloor int, ID string) {
+	orderTable[currentFloor][driver.ButtonTypeUp] = ""
+	orderTable[currentFloor][driver.ButtonTypeDown] = ""
+	if ID == elevatorID {
+		orderTable[currentFloor][driver.ButtonTypeCommand] = ""
+	}
+	UpdateButtonLight()
 }
 
 func GetMotorDirection(currentFloor int, currentDirection int) int {
@@ -235,15 +340,6 @@ func ShouldElevatorStopAtFloor(currentFloor int, currentDirection int) bool {
 		}
 	}
 	return false
-}
-
-func ClearOrdersAtFloor(currentFloor int) {
-	for button := 0; button < driver.NumButtons; button++ {
-		orderTable[currentFloor][button] = ""
-		if button != driver.ButtonTypeCommand {
-			externalOrders[currentFloor][button] = ""
-		}
-	}
 }
 
 func CheckIfOrderTableIsEmpty() bool {
