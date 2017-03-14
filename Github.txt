@@ -12,4 +12,9 @@ git init
 git pull https://github.com/martinty/heis.git 
 
 # clone from github
+git init
 git clone https://github.com/martinty/heis.git 
+
+# Note
+Må pulle ført hvis man ønsker å pushe de endringene man har gjort.
+Ellers kan man bare clone.
