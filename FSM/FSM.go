@@ -8,19 +8,18 @@ import (
 	"time"
 )
 
-const (
-	Idle     = "Idle    "
-	Running  = "Running "
-	DoorOpen = "DoorOpen"
-	Stuck    = "Stuck   "
-)
-
 var arrivedFloor int = -1
 var currentFloor int = -1
 var elevatorState string = ""
 var currentDirection int = -1
-
 var stuckTimer = time.Now().Add(1 * time.Hour)
+
+const (
+	idle     = "idle    "
+	running  = "running "
+	doorOpen = "doorOpen"
+	stuck    = "stuck   "
+)
 
 func ElevatorStartUp() {
 	fmt.Println("Elevator init")
@@ -32,31 +31,43 @@ func ElevatorStartUp() {
 	currentFloor = driver.ElevatorGetFloorSensorSignal()
 	driver.ElevatorSetFloorIndicator(currentFloor)
 	currentDirection = driver.MotorDirectionDown
-	elevatorState = Idle
+	elevatorState = idle
 	UpdateElevator()
 	fmt.Println("Elevator ready")
 }
 
-func ElevatorHasArrivedAtFloor(floorNumber int, deleteOrderChan chan source.Order) {
+func ElevatorHasArrivedAtFloor(floorNumber int, deleteOrderChan chan source.Order, onlineStatus chan bool) {
 	var deleteOrder source.Order
+	var elevatorOnline bool
 	switch elevatorState {
-	case Running:
+	case running:
 		arrivedFloor = floorNumber
 		if queue.CheckIfOrderTableIsEmpty() {
 			driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
-			elevatorState = Idle
+			elevatorState = idle
 			UpdateElevator()
 		} else if arrivedFloor != currentFloor {
 			currentFloor = arrivedFloor
 			if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
 				driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
-				elevatorState = DoorOpen
+				elevatorState = doorOpen
 				UpdateElevator()
-				deleteOrder.Command = "delete"
-				deleteOrder.Floor = currentFloor
-				deleteOrderChan <- deleteOrder
+				elevatorOnline = <-onlineStatus
+				if elevatorOnline {
+					deleteOrder.Command = "delete"
+					deleteOrder.Floor = currentFloor
+					deleteOrderChan <- deleteOrder
+				} else {
+					queue.ClearOrdersAtFloor(currentFloor, "offline")
+				}
 				doorTimer()
 			}
+		} else if currentFloor == driver.NumFloors-1 {
+			driver.ElevatorSetMotorDirection(driver.MotorDirectionDown)
+			currentDirection = driver.MotorDirectionDown
+		} else if currentFloor == 0 {
+			driver.ElevatorSetMotorDirection(driver.MotorDirectionUp)
+			currentDirection = driver.MotorDirectionUp
 		}
 		break
 	default:
@@ -64,50 +75,73 @@ func ElevatorHasArrivedAtFloor(floorNumber int, deleteOrderChan chan source.Orde
 	}
 }
 
-func CheckFloorAndSetElevetorDirection(deleteOrderChan chan source.Order) {
+func CheckFloorAndSetElevetorDirection(deleteOrderChan chan source.Order, onlineStatus chan bool) {
 	var deleteOrder source.Order
+	var elevatorOnline bool
 	switch elevatorState {
-	case DoorOpen:
+	case doorOpen:
 		if queue.CheckIfOrderTableIsEmpty() {
-			elevatorState = Idle
+			elevatorState = idle
 			UpdateElevator()
 			break
 		} else if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
-			deleteOrder.Command = "delete"
-			deleteOrder.Floor = currentFloor
-			deleteOrderChan <- deleteOrder
+			elevatorOnline = <-onlineStatus
+			if elevatorOnline {
+				deleteOrder.Command = "delete"
+				deleteOrder.Floor = currentFloor
+				deleteOrderChan <- deleteOrder
+			} else {
+				queue.ClearOrdersAtFloor(currentFloor, "offline")
+			}
 			UpdateElevator()
 			doorTimer()
 			break
 		} else {
 			currentDirection = queue.GetMotorDirection(currentFloor, currentDirection)
 			driver.ElevatorSetMotorDirection(currentDirection)
-			deleteOrder.Command = "none"
-			deleteOrderChan <- deleteOrder
-			elevatorState = Running
+			elevatorOnline = <-onlineStatus
+			if elevatorOnline {
+				deleteOrder.Command = "none"
+				deleteOrder.Floor = currentFloor
+				deleteOrderChan <- deleteOrder
+			} else {
+				queue.ClearOrdersAtFloor(currentFloor, "offline")
+			}
+			elevatorState = running
 			UpdateElevator()
-			StartStuckTimer()
+			startstuckTimer()
 			break
 		}
-	case Idle:
+	case idle:
 		if queue.CheckIfOrderTableIsEmpty() {
 			break
 		} else if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
-			deleteOrder.Command = "delete"
-			deleteOrder.Floor = currentFloor
-			deleteOrderChan <- deleteOrder
-			elevatorState = DoorOpen
+			elevatorOnline = <-onlineStatus
+			if elevatorOnline {
+				deleteOrder.Command = "delete"
+				deleteOrder.Floor = currentFloor
+				deleteOrderChan <- deleteOrder
+			} else {
+				queue.ClearOrdersAtFloor(currentFloor, "offline")
+			}
+			elevatorState = doorOpen
 			UpdateElevator()
 			doorTimer()
 			break
 		} else {
 			currentDirection = queue.GetMotorDirection(currentFloor, currentDirection)
 			driver.ElevatorSetMotorDirection(currentDirection)
-			deleteOrder.Command = "none"
-			deleteOrderChan <- deleteOrder
-			elevatorState = Running
+			elevatorOnline = <-onlineStatus
+			if elevatorOnline {
+				deleteOrder.Command = "none"
+				deleteOrder.Floor = currentFloor
+				deleteOrderChan <- deleteOrder
+			} else {
+				queue.ClearOrdersAtFloor(currentFloor, "offline")
+			}
+			elevatorState = running
 			UpdateElevator()
-			StartStuckTimer()
+			startstuckTimer()
 			break
 		}
 	default:
@@ -117,18 +151,18 @@ func CheckFloorAndSetElevetorDirection(deleteOrderChan chan source.Order) {
 
 func CheckIfElevatorIsStuck(floorNumber int) {
 	switch elevatorState {
-	case Running:
+	case running:
 		if floorNumber != -1 && floorNumber != currentFloor {
-			StartStuckTimer()
+			startstuckTimer()
 		}
-		CheckStuckTimer()
+		checkstuckTimer()
 		break
-	case Stuck:
+	case stuck:
 		if floorNumber != -1 && floorNumber != currentFloor {
 			currentFloor = floorNumber
-			elevatorState = Running
+			elevatorState = running
 			UpdateElevator()
-			StartStuckTimer()
+			startstuckTimer()
 		}
 		break
 	default:
@@ -136,27 +170,27 @@ func CheckIfElevatorIsStuck(floorNumber int) {
 	}
 }
 
-func doorTimer() {
-	DoorOpenTimer := time.NewTimer(time.Second * 3)
-	driver.ElevatorSetDoorOpenLamp(true)
-	<-DoorOpenTimer.C
-	driver.ElevatorSetDoorOpenLamp(false)
-}
-
-func StartStuckTimer() {
-	currentTime := time.Now()
-	stuckTimer = currentTime.Add(5 * time.Second)
-}
-
-func CheckStuckTimer() {
-	currentTime := time.Now()
-	if currentTime.After(stuckTimer) {
-		elevatorState = Stuck
-	}
-}
-
 func UpdateElevator() {
 	queue.UpdateElevatorDirection(currentDirection)
 	queue.UpdateElevatorFloor(currentFloor)
 	queue.UpdateElevatorState(elevatorState)
+}
+
+func doorTimer() {
+	doorOpenTimer := time.NewTimer(time.Second * 3)
+	driver.ElevatorSetDoorOpenLamp(true)
+	<-doorOpenTimer.C
+	driver.ElevatorSetDoorOpenLamp(false)
+}
+
+func startstuckTimer() {
+	currentTime := time.Now()
+	stuckTimer = currentTime.Add(5 * time.Second)
+}
+
+func checkstuckTimer() {
+	currentTime := time.Now()
+	if currentTime.After(stuckTimer) {
+		elevatorState = stuck
+	}
 }

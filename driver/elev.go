@@ -29,7 +29,6 @@ var buttonChannelsMatrix = [NumFloors][NumButtons]int{
 }
 
 func InitializeElevator() bool {
-
 	initStatus := IOInitializeElevator()
 	if !initStatus {
 		return false
@@ -44,7 +43,6 @@ func InitializeElevator() bool {
 }
 
 func ElevatorSetMotorDirection(motorDirection int) {
-
 	if motorDirection == 0 {
 		IOClearBit(motorDir)
 		IOWriteAnalog(motor, motorSpeed)
@@ -59,7 +57,6 @@ func ElevatorSetMotorDirection(motorDirection int) {
 }
 
 func ElevatorSetButtonLamp(buttonType int, floor int, status bool) {
-
 	if status {
 		IOSetBit(lampChannelsMatrix[floor][buttonType])
 	} else {

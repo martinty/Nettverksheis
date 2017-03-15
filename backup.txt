@@ -1,0 +1,1 @@
+{"ID":"161","CurrentFloor":3,"CurrentDirection":1,"State":"stuck   ","LocalOrders":["","","161",""],"ExternalOrders":[["",""],["",""],["",""],["",""]],"NewOrder":{"Command":"none","Floor":0,"Button":0,"ElevID":""},"DeleteOrder":{"Command":"none","Floor":3,"Button":0,"ElevID":""},"DeleteAddOrder":{"Command":"none","Floor":0,"Button":0,"ElevID":""}}

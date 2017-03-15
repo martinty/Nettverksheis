@@ -23,8 +23,10 @@ type Order struct {
 	ElevID  string
 }
 
-func CheckForError(err error) {
+func CheckForError(err error) bool {
 	if err != nil {
 		fmt.Println("Error:", err)
+		return true
 	}
+	return false
 }

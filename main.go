@@ -6,14 +6,12 @@ import (
 	"./network/UDP"
 	"./queue"
 	"./source"
-	//"fmt"
 	"os"
 	"os/signal"
 	"syscall"
-	//"time"
 )
 
-func runFSM(deleteOrderChan chan source.Order) {
+func runFSM(deleteOrderChan chan source.Order, onlineStatus chan bool) {
 	var floorNumber int = -1
 	for {
 		FSM.UpdateElevator()
@@ -22,13 +20,13 @@ func runFSM(deleteOrderChan chan source.Order) {
 
 		if floorNumber != -1 {
 			driver.ElevatorSetFloorIndicator(floorNumber)
-			FSM.ElevatorHasArrivedAtFloor(floorNumber, deleteOrderChan)
-			FSM.CheckFloorAndSetElevetorDirection(deleteOrderChan)
+			FSM.ElevatorHasArrivedAtFloor(floorNumber, deleteOrderChan, onlineStatus)
+			FSM.CheckFloorAndSetElevetorDirection(deleteOrderChan, onlineStatus)
 		}
 	}
 }
 
-func handleKill() {
+func handleProgramKill() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
@@ -38,37 +36,28 @@ func handleKill() {
 
 func main() {
 
-	//queue.DeleteFile()
-
 	var msg source.ElevInfo
+	port := ":22017"
+	msg.ID = UDP.GetLocalID()
+	driver.InitializeElevator()
+	FSM.ElevatorStartUp()
+	queue.Init(msg.ID)
 
 	newMsgChanRecive := make(chan source.ElevInfo, 1)
 	newMsgChanTransmit := make(chan source.ElevInfo, 1)
-	newOrderChan := make(chan source.Order, 10)       // <- Kan tune det taller her
-	deleteOrderChan := make(chan source.Order, 10)    // <- Kan tune det taller her
-	deleteAddOrderChan := make(chan source.Order, 10) // <- Kan tune det taller her
-
-	port := ":20013"
-
-	if queue.CreateFile() {
-		msg.ID = UDP.GetLocalID(UDP.GetLocalIP())
-		queue.WriteToFile(msg)
-	} else {
-		msg = queue.ReadFromFile()
-	}
-
-	driver.InitializeElevator()
-	FSM.ElevatorStartUp()
-	queue.Init()
+	newOrderChan := make(chan source.Order, 10)
+	deleteOrderChan := make(chan source.Order, 10)
+	deleteAddOrderChan := make(chan source.Order, 1)
+	onlineStatus := make(chan bool, 1)
 
 	go UDP.Receiving(port, newMsgChanRecive)
-	go UDP.Transmitting(port, msg, newMsgChanTransmit)
+	go UDP.TransmittingBroadcast(port, msg, newMsgChanTransmit, onlineStatus)
 	go queue.UpdateOrdersAfterReceiving(newMsgChanRecive, deleteAddOrderChan)
 	go queue.UpdateElevatorInfoBeforeTransmitting(newMsgChanTransmit, newOrderChan, deleteOrderChan, deleteAddOrderChan, msg)
 	go queue.CheckForOrdersAndDistribute(newOrderChan)
-	go runFSM(deleteOrderChan)
+	go runFSM(deleteOrderChan, onlineStatus)
 
 	for {
-		handleKill()
+		handleProgramKill()
 	}
 }
