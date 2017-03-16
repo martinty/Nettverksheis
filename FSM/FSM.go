@@ -45,9 +45,11 @@ func ElevatorHasArrivedAtFloor(floorNumber int, deleteOrderChan chan source.Orde
 		if queue.CheckIfOrderTableIsEmpty() {
 			driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
 			elevatorState = idle
+			currentFloor = arrivedFloor
 			UpdateElevator()
 		} else if arrivedFloor != currentFloor {
 			currentFloor = arrivedFloor
+			UpdateElevator()
 			if queue.ShouldElevatorStopAtFloor(currentFloor, currentDirection) {
 				driver.ElevatorSetMotorDirection(driver.MotorDirectionStop)
 				elevatorState = doorOpen
@@ -69,6 +71,7 @@ func ElevatorHasArrivedAtFloor(floorNumber int, deleteOrderChan chan source.Orde
 			driver.ElevatorSetMotorDirection(driver.MotorDirectionUp)
 			currentDirection = driver.MotorDirectionUp
 		}
+		UpdateElevator()
 		break
 	default:
 		break
