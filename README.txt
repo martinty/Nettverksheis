@@ -1,3 +1,3 @@
-TTK4145 - Sanntidsprogrammering
+#TTK4145 - Sanntidsprogrammering
 
 Heisprosjekt i GO
