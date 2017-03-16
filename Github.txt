@@ -1,5 +1,3 @@
-cd D:\Dropbox\NTNU\Vår 2017\TTK4145 Sanntidsprogrammering\gr26\main
-
 # push to github
 git init
 git add .
@@ -16,5 +14,5 @@ git init
 git clone https://github.com/martinty/heis.git 
 
 # Note
-Må pulle ført hvis man ønsker å pushe de endringene man har gjort.
+Må pulle først hvis man ønsker å pushe de endringene man har gjort.
 Ellers kan man bare clone.
