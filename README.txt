@@ -1,3 +1,3 @@
-TTK4145 - Sanntidsprogrammering
-
-Heisprosjekt i GO
+TTK4145 - Sanntidsprogrammering <br />
+Heisprosjekt i GO <br />
+Våren 2017
